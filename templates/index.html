@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>YouTube Downloader</title>
+    <style>
+        body { font-family: Arial; padding: 50px; background: #f0f2f5; }
+        .container { max-width: 500px; margin: auto; background: #fff; padding: 30px; border-radius: 10px; }
+        input, button { width: 100%; padding: 10px; margin: 5px 0; }
+        button { background: #007BFF; color: white; border: none; cursor: pointer; }
+        .progress-container { background: #eee; height: 20px; border-radius: 10px; overflow: hidden; margin: 10px 0; }
+        #progressBar { height: 100%; width: 0%; background: #28a745; transition: width 0.3s; }
+        #statusText { margin: 5px 0; }
+        #downloadLink { display: none; margin-top: 10px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>YouTube Downloader</h1>
+    <form id="downloadForm">
+        <input type="text" name="url" id="url" placeholder="Paste YouTube link" required>
+        <button type="submit">Download</button>
+    </form>
+    <div class="progress-container">
+        <div id="progressBar"></div>
+    </div>
+    <p id="statusText"></p>
+    <a id="downloadLink" download>Download File</a>
+</div>
+
+<script>
+    const form = document.getElementById("downloadForm");
+    const progressBar = document.getElementById("progressBar");
+    const statusText = document.getElementById("statusText");
+    const downloadLink = document.getElementById("downloadLink");
+
+    let pollInterval;
+
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const url = document.getElementById("url").value.trim();
+        if (!url) return;
+
+        statusText.textContent = "Starting download...";
+        progressBar.style.width = "0%";
+        downloadLink.style.display = "none";
+
+        // Start job
+        const res = await fetch("/start", {
+            method: "POST",
+            body: new URLSearchParams({url})
+        });
+        const data = await res.json();
+        const job_id = data.job_id;
+
+        // Poll status
+        pollInterval = setInterval(async () => {
+            const sres = await fetch("/status/" + job_id);
+            const statusData = await sres.json();
+
+            statusText.textContent = statusData.status + " " + (statusData.progress || "");
+            if (statusData.progress) {
+                progressBar.style.width = statusData.progress;
+            }
+
+            if (statusData.status === "done") {
+                clearInterval(pollInterval);
+                statusText.textContent = "Download completed!";
+                downloadLink.href = "/download/" + job_id;
+                downloadLink.style.display = "inline";
+            }
+
+            if (statusData.status === "error") {
+                clearInterval(pollInterval);
+                statusText.textContent = "Error occurred!";
+            }
+
+        }, 1000);
+    });
+</script>
+</body>
+</html>
