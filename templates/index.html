@@ -1,82 +1,140 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>YouTube Downloader</title>
+
     <style>
-        body { font-family: Arial; padding: 50px; background: #f0f2f5; }
-        .container { max-width: 500px; margin: auto; background: #fff; padding: 30px; border-radius: 10px; }
-        input, button { width: 100%; padding: 10px; margin: 5px 0; }
-        button { background: #007BFF; color: white; border: none; cursor: pointer; }
-        .progress-container { background: #eee; height: 20px; border-radius: 10px; overflow: hidden; margin: 10px 0; }
-        #progressBar { height: 100%; width: 0%; background: #28a745; transition: width 0.3s; }
-        #statusText { margin: 5px 0; }
-        #downloadLink { display: none; margin-top: 10px; }
+        body {
+            font-family: Arial;
+            padding: 20px;
+            max-width: 600px;
+            margin: auto;
+            background: #0d0d0d;
+            color: #ffffff;
+        }
+
+        h2 {
+            text-align: center;
+            font-size: 28px;
+            margin-bottom: 25px;
+            color: #00eaff;
+        }
+
+        input {
+            width: 100%;
+            padding: 14px;
+            font-size: 17px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            border: none;
+            background: #1d1d1d;
+            color: white;
+            outline: none;
+            border: 2px solid #333;
+        }
+
+        input:focus {
+            border-color: #00eaff;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: #007bff;
+            color: white;
+            border: none;
+            font-size: 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        #progress-box {
+            margin-top: 20px;
+            width: 100%;
+            background: #333;
+            height: 22px;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        #progress-bar {
+            width: 0%;
+            height: 100%;
+            background: #00ff66;
+            transition: width 0.2s;
+        }
+
+        #status {
+            margin-top: 12px;
+            text-align: center;
+            font-size: 16px;
+            color: #00eaff;
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            h2 {
+                font-size: 22px;
+            }
+
+            button, input {
+                font-size: 16px;
+                padding: 12px;
+            }
+        }
     </style>
 </head>
 <body>
-<div class="container">
-    <h1>YouTube Downloader</h1>
-    <form id="downloadForm">
-        <input type="text" name="url" id="url" placeholder="Paste YouTube link" required>
-        <button type="submit">Download</button>
-    </form>
-    <div class="progress-container">
-        <div id="progressBar"></div>
-    </div>
-    <p id="statusText"></p>
-    <a id="downloadLink" download>Download File</a>
+
+<h2>YouTube Downloader</h2>
+
+<form id="downloadForm">
+    <input type="text" name="url" placeholder="Paste YouTube link" required>
+    <button type="submit">Download</button>
+</form>
+
+<div id="progress-box">
+    <div id="progress-bar"></div>
 </div>
 
+<p id="status"></p>
+
 <script>
-    const form = document.getElementById("downloadForm");
-    const progressBar = document.getElementById("progressBar");
-    const statusText = document.getElementById("statusText");
-    const downloadLink = document.getElementById("downloadLink");
-
-    let pollInterval;
-
-    form.addEventListener("submit", async (e) => {
+    document.getElementById("downloadForm").onsubmit = function (e) {
         e.preventDefault();
-        const url = document.getElementById("url").value.trim();
-        if (!url) return;
 
-        statusText.textContent = "Starting download...";
-        progressBar.style.width = "0%";
-        downloadLink.style.display = "none";
-
-        // Start job
-        const res = await fetch("/start", {
+        fetch("/start-download", {
             method: "POST",
-            body: new URLSearchParams({url})
+            body: new FormData(this)
         });
-        const data = await res.json();
-        const job_id = data.job_id;
 
-        // Poll status
-        pollInterval = setInterval(async () => {
-            const sres = await fetch("/status/" + job_id);
-            const statusData = await sres.json();
+        checkProgress();
+    };
 
-            statusText.textContent = statusData.status + " " + (statusData.progress || "");
-            if (statusData.progress) {
-                progressBar.style.width = statusData.progress;
-            }
+    function checkProgress() {
+        const interval = setInterval(() => {
+            fetch("/progress")
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById("progress-bar").style.width = data.progress + "%";
+                    document.getElementById("status").innerText =
+                        data.status + " " + Math.round(data.progress) + "%";
 
-            if (statusData.status === "done") {
-                clearInterval(pollInterval);
-                statusText.textContent = "Download completed!";
-                downloadLink.href = "/download/" + job_id;
-                downloadLink.style.display = "inline";
-            }
-
-            if (statusData.status === "error") {
-                clearInterval(pollInterval);
-                statusText.textContent = "Error occurred!";
-            }
-
-        }, 1000);
-    });
+                    if (data.progress >= 100) {
+                        clearInterval(interval);
+                        document.getElementById("status").innerText = "Download Ready!";
+                        window.location = "/download-file";
+                    }
+                });
+        }, 500);
+    }
 </script>
+
 </body>
 </html>

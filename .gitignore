@@ -1,24 +1,59 @@
+# ----------------------------
 # Python cache and bytecode
+# ----------------------------
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 
-# Virtual environment
+# ----------------------------
+# Virtual environments
+# ----------------------------
 venv/
 .venv/
+env/
+.env/
 
-# Downloads folder (your downloaded videos)
+# ----------------------------
+# Downloads folder (videos)
+# ----------------------------
 downloads/
 
+# ----------------------------
+# Cookies folder (keep private)
+# ----------------------------
+cookies/
+
+# ----------------------------
 # Logs
+# ----------------------------
 *.log
 logs/
 
+# ----------------------------
 # OS files
+# ----------------------------
 .DS_Store
 Thumbs.db
 
+# ----------------------------
 # IDE settings
+# ----------------------------
 .vscode/
 .idea/
+*.sublime-project
+*.sublime-workspace
+
+# ----------------------------
+# Python packaging
+# ----------------------------
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ----------------------------
+# Environment files (optional)
+# ----------------------------
+.env
