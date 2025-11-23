@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, send_file, jsonify
 import yt_dlp
 import os
 from threading import Thread
+import shutil
 
 app = Flask(__name__)
 
@@ -25,38 +26,41 @@ def progress_hook(d):
         progress_data["progress"] = 100
         progress_data["status"] = "Processing..."
 
-
 # ---------------------------
 # Cookies File (Render Secret File)
 # ---------------------------
+SECRET_COOKIE_PATH = "/etc/secrets/cookies.txt"
+WORKING_COOKIE_PATH = "/tmp/cookies.txt"  # yt-dlp needs writable file
 
-# Path where Render stores secret files
-COOKIE_FILE_PATH = "/etc/secrets/cookies.txt"
-
-# Check if file exists
-if not os.path.exists(COOKIE_FILE_PATH):
-    print("[WARNING] cookies.txt not found inside /etc/secrets/.")
+if os.path.exists(SECRET_COOKIE_PATH):
+    shutil.copy(SECRET_COOKIE_PATH, WORKING_COOKIE_PATH)
+    print("[INFO] cookies.txt loaded and copied to /tmp.")
 else:
-    print("[INFO] cookies.txt loaded successfully.")
-
+    WORKING_COOKIE_PATH = None
+    print("[WARNING] cookies.txt not found. Download may fail for age-restricted/private videos.")
 
 # ---------------------------
-# Background download function
+# Download function
 # ---------------------------
 def download_video(url, download_path):
+    os.makedirs(download_path, exist_ok=True)
+
     ydl_opts = {
         'outtmpl': os.path.join(download_path, '%(title)s.%(ext)s'),
         'progress_hooks': [progress_hook],
         'format': 'mp4',
-        'cookiefile': COOKIE_FILE_PATH,   # use the secret file cookies
+        'cookiefile': WORKING_COOKIE_PATH,  # use writable copy
         'noplaylist': True,
         'quiet': True,
         'no_warnings': True,
     }
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
-
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+    except Exception as e:
+        progress_data["status"] = f"Error: {e}"
+        progress_data["progress"] = 0
 
 # ---------------------------
 # Routes
@@ -65,13 +69,12 @@ def download_video(url, download_path):
 def index():
     return render_template("index.html")
 
-
 @app.route("/start-download", methods=["POST"])
 def start_download():
     url = request.form.get("url")
     download_path = "downloads"
-    os.makedirs(download_path, exist_ok=True)
 
+    # Reset progress
     progress_data["progress"] = 0
     progress_data["status"] = "Starting..."
 
@@ -79,20 +82,18 @@ def start_download():
 
     return jsonify({"message": "started"})
 
-
 @app.route("/progress")
 def progress():
     return jsonify(progress_data)
 
-
 @app.route("/download-file")
 def download_file():
-    files = os.listdir("downloads")
+    download_path = "downloads"
+    files = os.listdir(download_path) if os.path.exists(download_path) else []
     if not files:
         return "File not found", 404
-    file_path = os.path.join("downloads", files[0])
+    file_path = os.path.join(download_path, files[0])
     return send_file(file_path, as_attachment=True)
-
 
 # ---------------------------
 # Main app
