@@ -45,21 +45,42 @@ else:
 def download_video(url, download_path):
     os.makedirs(download_path, exist_ok=True)
 
+    # Check if cookies file exists and is readable
+    cookie_file = WORKING_COOKIE_PATH
+    if cookie_file and not os.path.exists(cookie_file):
+        cookie_file = None
+        print("[WARNING] Cookies file not found. Some videos may fail.")
+
+    # yt-dlp options
     ydl_opts = {
         'outtmpl': os.path.join(download_path, '%(title)s.%(ext)s'),
         'progress_hooks': [progress_hook],
         'format': 'mp4',
-        'cookiefile': WORKING_COOKIE_PATH,  # use writable copy
         'noplaylist': True,
         'quiet': True,
         'no_warnings': True,
+        'cookiefile': cookie_file,
+        'nocheckcertificate': True,
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                          'AppleWebKit/537.36 (KHTML, like Gecko) '
+                          'Chrome/142.0.0.0 Safari/537.36'
+        }
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
+    except yt_dlp.utils.DownloadError as de:
+        # Detect bot/cookies issues
+        if "Sign in to confirm" in str(de):
+            progress_data["status"] = ("Error: YouTube requires login. "
+                                       "Your cookies may be expired or invalid.")
+        else:
+            progress_data["status"] = f"Download Error: {de}"
+        progress_data["progress"] = 0
     except Exception as e:
-        progress_data["status"] = f"Error: {e}"
+        progress_data["status"] = f"Unexpected Error: {e}"
         progress_data["progress"] = 0
 
 # ---------------------------
