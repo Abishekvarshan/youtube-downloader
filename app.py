@@ -45,6 +45,30 @@ else:
 def download_video(url, download_path):
     os.makedirs(download_path, exist_ok=True)
 
+    # Convert Shorts URL to regular watch URL
+    if "youtube.com/shorts/" in url:
+        video_id = url.split("/shorts/")[1].split("?")[0]
+        url = f"https://www.youtube.com/watch?v={video_id}"
+
+    ydl_opts = {
+        'outtmpl': os.path.join(download_path, '%(title)s.%(ext)s'),
+        'progress_hooks': [progress_hook],
+        'format': 'mp4',
+        'cookiefile': WORKING_COOKIE_PATH,
+        'noplaylist': True,
+        'quiet': True,
+        'no_warnings': True,
+        'force_generic_extractor': True,  # safer for Shorts/links
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+    except Exception as e:
+        progress_data["status"] = f"Error: {e}"
+        progress_data["progress"] = 0
+    os.makedirs(download_path, exist_ok=True)
+
     # Check if cookies file exists and is readable
     cookie_file = WORKING_COOKIE_PATH
     if cookie_file and not os.path.exists(cookie_file):
