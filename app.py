@@ -2,7 +2,6 @@ from flask import Flask, render_template, request, send_file, jsonify
 import yt_dlp
 import os
 from threading import Thread
-import shutil
 
 app = Flask(__name__)
 
@@ -27,38 +26,18 @@ def progress_hook(d):
         progress_data["status"] = "Processing..."
 
 # ---------------------------
-# Cookies File (Render Secret File)
-# ---------------------------
-SECRET_COOKIE_PATH = "/etc/secrets/cookies.txt"
-WORKING_COOKIE_PATH = "/tmp/cookies.txt"  # yt-dlp needs writable file
-
-if os.path.exists(SECRET_COOKIE_PATH):
-    shutil.copy(SECRET_COOKIE_PATH, WORKING_COOKIE_PATH)
-    print("[INFO] cookies.txt loaded and copied to /tmp.")
-else:
-    WORKING_COOKIE_PATH = None
-    print("[WARNING] cookies.txt not found. Download may fail for age-restricted/private videos.")
-
-# ---------------------------
 # Download function
 # ---------------------------
 def download_video(url, download_path):
     os.makedirs(download_path, exist_ok=True)
 
-    # Convert Shorts URL to regular watch URL
-    if "youtube.com/shorts/" in url:
-        video_id = url.split("/shorts/")[1].split("?")[0]
-        url = f"https://www.youtube.com/watch?v={video_id}"
-
     ydl_opts = {
         'outtmpl': os.path.join(download_path, '%(title)s.%(ext)s'),
         'progress_hooks': [progress_hook],
         'format': 'mp4',
-        'cookiefile': WORKING_COOKIE_PATH,
         'noplaylist': True,
         'quiet': True,
         'no_warnings': True,
-        'force_generic_extractor': True,  # safer for Shorts/links
     }
 
     try:
@@ -66,45 +45,6 @@ def download_video(url, download_path):
             ydl.download([url])
     except Exception as e:
         progress_data["status"] = f"Error: {e}"
-        progress_data["progress"] = 0
-    os.makedirs(download_path, exist_ok=True)
-
-    # Check if cookies file exists and is readable
-    cookie_file = WORKING_COOKIE_PATH
-    if cookie_file and not os.path.exists(cookie_file):
-        cookie_file = None
-        print("[WARNING] Cookies file not found. Some videos may fail.")
-
-    # yt-dlp options
-    ydl_opts = {
-        'outtmpl': os.path.join(download_path, '%(title)s.%(ext)s'),
-        'progress_hooks': [progress_hook],
-        'format': 'mp4',
-        'noplaylist': True,
-        'quiet': True,
-        'no_warnings': True,
-        'cookiefile': cookie_file,
-        'nocheckcertificate': True,
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-                          'AppleWebKit/537.36 (KHTML, like Gecko) '
-                          'Chrome/142.0.0.0 Safari/537.36'
-        }
-    }
-
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
-    except yt_dlp.utils.DownloadError as de:
-        # Detect bot/cookies issues
-        if "Sign in to confirm" in str(de):
-            progress_data["status"] = ("Error: YouTube requires login. "
-                                       "Your cookies may be expired or invalid.")
-        else:
-            progress_data["status"] = f"Download Error: {de}"
-        progress_data["progress"] = 0
-    except Exception as e:
-        progress_data["status"] = f"Unexpected Error: {e}"
         progress_data["progress"] = 0
 
 # ---------------------------
