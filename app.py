@@ -5,6 +5,9 @@ from threading import Thread
 
 app = Flask(__name__)
 
+# ---------------------------
+# Global progress dictionary
+# ---------------------------
 progress_data = {"progress": 0, "status": ""}
 
 # ---------------------------
@@ -24,17 +27,17 @@ def progress_hook(d):
 
 
 # ---------------------------
-# Prepare cookies file from environment variable
+# Cookies File (Render Secret File)
 # ---------------------------
-COOKIE_FILE_PATH = "cookies/cookies.txt"
-os.makedirs("cookies", exist_ok=True)
 
-cookie_content = os.environ.get("YOUTUBE_COOKIES", "")
-if cookie_content:
-    with open(COOKIE_FILE_PATH, "w") as f:
-        f.write(cookie_content)
+# Path where Render stores secret files
+COOKIE_FILE_PATH = "/etc/secrets/cookies.txt"
+
+# Check if file exists
+if not os.path.exists(COOKIE_FILE_PATH):
+    print("[WARNING] cookies.txt not found inside /etc/secrets/.")
 else:
-    print("[WARNING] Environment variable YOUTUBE_COOKIES is not set. YouTube downloads may fail for age-restricted/private videos.")
+    print("[INFO] cookies.txt loaded successfully.")
 
 
 # ---------------------------
@@ -45,7 +48,7 @@ def download_video(url, download_path):
         'outtmpl': os.path.join(download_path, '%(title)s.%(ext)s'),
         'progress_hooks': [progress_hook],
         'format': 'mp4',
-        'cookiefile': COOKIE_FILE_PATH,  # Use cookies from env
+        'cookiefile': COOKIE_FILE_PATH,   # use the secret file cookies
         'noplaylist': True,
         'quiet': True,
         'no_warnings': True,
@@ -69,11 +72,9 @@ def start_download():
     download_path = "downloads"
     os.makedirs(download_path, exist_ok=True)
 
-    # Reset progress
     progress_data["progress"] = 0
     progress_data["status"] = "Starting..."
 
-    # Download in background thread
     Thread(target=download_video, args=(url, download_path)).start()
 
     return jsonify({"message": "started"})
@@ -93,5 +94,9 @@ def download_file():
     return send_file(file_path, as_attachment=True)
 
 
+# ---------------------------
+# Main app
+# ---------------------------
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
